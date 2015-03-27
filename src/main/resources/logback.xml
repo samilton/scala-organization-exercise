@@ -4,8 +4,6 @@
 <!-- The default logback configuration used by the DataPlant projects -->
 <configuration>
 
-  <conversionRule conversionWord="coloredLevel" converterClass="play.api.Logger$ColoredLevel" />
-
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
       <pattern>%date %level %logger{15} - %message%n%xException{10}</pattern>
