@@ -1,0 +1,43 @@
+#!/bin/bash
+set -o errexit -o nounset -o pipefail
+function -h {
+cat <<USAGE
+ USAGE: runner <fully qualified class to run> [arguments to pass to class]
+  Run Dataplant processes
+
+  This will execute the class provided with the arguments provided.
+USAGE
+}; function --help { -h ;}
+export LC_ALL=en_US.UTF-8
+
+self="$(cd "$(dirname "$0")" && pwd -P)"/"$(basename "$0")"
+jar="$self"
+
+function main {
+  run_jar "$@"
+}
+
+function run_jar {
+  local log_format='%2$s %5$s%6$s%n' # Class name, message, exception
+  ulimit -n 8192
+  local vm_opts=( -Xmx512m
+                  -Djava.util.logging.SimpleFormatter.format="$log_format" )
+  exec java "${vm_opts[@]}" -jar "$jar" "$@"
+}
+
+function logged {
+  local token="$1[$$]" ; shift
+  exec 1> >(exec logger -p user.info   -t "$token")
+  exec 2> >(exec logger -p user.notice -t "$token")
+  "$@"
+}
+
+function msg { out "$*" >&2 ;}
+function err { local x=$? ; msg "$*" ; return $(( $x == 0 ? 1 : $x )) ;}
+function out { printf '%s\n' "$*" ;}
+
+if [[ ${1:-} ]] && declare -F | cut -d' ' -f3 | fgrep -qx -- "${1:-}"
+then "$@"
+else main "$@"
+fi
+exit

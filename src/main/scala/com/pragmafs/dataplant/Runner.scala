@@ -1,8 +1,12 @@
 package com.pragmafs.dataplant
 
+import java.lang.management.ManagementFactory
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
 import org.slf4j.LoggerFactory
+import com.pragmafs.dataplant.ProcessContext
+
+import scala.collection.mutable.ArrayBuffer
 
 
 /*
@@ -28,21 +32,51 @@ object Runner extends App {
 
   private[this] val logger = LoggerFactory.getLogger(Runner.getClass)
 
-  StatusPrinter.print((LoggerFactory.getILoggerFactory).asInstanceOf[LoggerContext])
+  val runtimeMxBean = ManagementFactory.getRuntimeMXBean();
+  val arguments = runtimeMxBean.getInputArguments();
+  StatusPrinter.print(LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext])
 
+  logger.info("JVM Options are [ %s ]".format(arguments.toArray().mkString(", ")))
+  logger.info("Options are [ %s ]".format(args.mkString(", ")))
+
+  // TODO this group of methods is messy. there has to be a better way to compose this. (more java than scala)
+  // TODO Need to get some error handling on here. Maybe this should be an object itself?
   def getObjectToRun(clazz: String): DataProcess = {
     Class.forName(clazz).newInstance().asInstanceOf[DataProcess]
   }
 
+  // TODO Again there needs to be some error handling here. What if there are no options?
   def cleanArguments(args: Array[String]): Array[String] = {
-    args.slice(1, args.length)
+    var argz = new ArrayBuffer[String]
+    argz = argz ++ args
+    if(argz.contains("--date")) {
+      argz.remove(argz.indexOf("--date"), 2)
+    }
+
+    argz.slice(1, args.length).toArray
+
   }
 
-  var dataProcessToRun = getObjectToRun(args(0))
-  val actualArguments = cleanArguments(args)
+  def isHoliday(args: Array[String]) = { args.contains("--holiday")}
 
-  logger.info("Executing [%s] with [%s]".format(dataProcessToRun.getClass, actualArguments.mkString(", ")))
+  def getDate(args: Array[String]): Option[String] = {
+    if(args.contains("--date")) {
+      val date = args(args.indexOf("--date") + 1)
+      // remove date from the options?
+      Some(date)
+    } else {
+      None
+    }
+  }
 
-  dataProcessToRun.execute(actualArguments)
+  val dataProcessToRun = getObjectToRun(args(0))
+  var processArguments = cleanArguments(args)
+  var date = getDate(args)
+
+  // maybe instead of an "ProcessContext" which is very "java-like" this should be a map?
+  // recalling my original idea it was to allow the date argument to be used an what it is
+  // an Option. The same for holidays so maybe using an object here makes sense.
+  val context = new ProcessContext(args(0), processArguments, date)
+  dataProcessToRun.execute(context)
 
 }
