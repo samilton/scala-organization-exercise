@@ -4,9 +4,11 @@ import java.lang.management.ManagementFactory
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
 import org.slf4j.LoggerFactory
-import com.pragmafs.dataplant.ProcessContext
 
-import scala.collection.mutable.ArrayBuffer
+import scala.util.{Failure, Success, Try}
+import java.util.Date
+import java.text.SimpleDateFormat
+import scala.annotation.tailrec
 
 
 /*
@@ -29,54 +31,81 @@ import scala.collection.mutable.ArrayBuffer
  * sentry config, etc).
  */
 object Runner extends App {
+  // Adds implicits that let us convert from Java to Scala collections easily
+  import scala.collection.JavaConversions._
 
   private[this] val logger = LoggerFactory.getLogger(Runner.getClass)
 
-  val runtimeMxBean = ManagementFactory.getRuntimeMXBean();
-  val arguments = runtimeMxBean.getInputArguments();
+  // style - no need for () or ;
+  val runtimeMxBean = ManagementFactory.getRuntimeMXBean
+
+  // ugh; why the cast?
   StatusPrinter.print(LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext])
 
-  logger.info("JVM Options are [ %s ]".format(arguments.toArray().mkString(", ")))
-  logger.info("Options are [ %s ]".format(args.mkString(", ")))
+  // we don't use the val anywhere else, so let's just inline it (it's not that long)
+  // now arguments is a List we can just use mkString directly
+  // use string interpolation
+  logger.info(s"JVM Options are [${runtimeMxBean.getInputArguments.toList mkString ", "}]")
+
+  // less punctuation, use string interpolation
+  logger.info(s"Options are [${args mkString ","}]")
 
   // TODO this group of methods is messy. there has to be a better way to compose this. (more java than scala)
   // TODO Need to get some error handling on here. Maybe this should be an object itself?
-  def getObjectToRun(clazz: String): DataProcess = {
+  // You could wrap this in a Try like this
+  def getObjectToRun(clazz: String): Try[DataProcess] = Try {
     Class.forName(clazz).newInstance().asInstanceOf[DataProcess]
   }
 
-  // TODO Again there needs to be some error handling here. What if there are no options?
-  def cleanArguments(args: Array[String]): Array[String] = {
-    var argz = new ArrayBuffer[String]
-    argz = argz ++ args
-    if(argz.contains("--date")) {
-      argz.remove(argz.indexOf("--date"), 2)
-    }
+  // Here's an idea for building a config object from the args... but maybe there's a
+  // library out there to do this.
+  case class Arguments(
+    className: Option[String] = None,
+    isHoliday: Boolean        = false,       // optional parameter, so this is a default value
+    date:      Option[Date]   = None,
+    otherArgs: List[String]   = Nil
+  )
 
-    argz.slice(1, args.length).toArray
+  @tailrec
+  def parseArguments(args: Seq[String], a: Arguments = Arguments()): Arguments = args match {
+    case Nil =>
+      // no more args
+      a
 
+    case "--date" :: dateStr :: as =>
+      // parse the date - maybe hoist this format object
+      val d = new SimpleDateFormat("yyyyMMdd").parse(dateStr)
+      parseArguments(as, a.copy(date = Some(d)))
+
+    case "--holiday" :: as =>
+      // holiday flag
+      parseArguments(as, a.copy(isHoliday = true))
+
+    case "--" :: as =>
+      // gnu-style end of params marker; stop here
+      a.copy(otherArgs = as)
+
+    case string :: as =>
+      // first string is the classname
+      if (a.className.isDefined)
+        sys.error("duplicate classname specified")
+      else
+        parseArguments(as, a.copy(className = Some(string)))
   }
 
-  def isHoliday(args: Array[String]) = { args.contains("--holiday")}
+  val arguments = parseArguments(args)
 
-  def getDate(args: Array[String]): Option[String] = {
-    if(args.contains("--date")) {
-      val date = args(args.indexOf("--date") + 1)
-      // remove date from the options?
-      Some(date)
-    } else {
-      None
+  val dataProcessToRun = arguments.className match {
+    case Some(c) => getObjectToRun(c) match {
+      case Success(d) => d
+      case Failure(e) => sys.error(s"unable to load class $c; ${e.getMessage}")
     }
+    case None    => sys.error("no classname specified")
   }
-
-  val dataProcessToRun = getObjectToRun(args(0))
-  var processArguments = cleanArguments(args)
-  var date = getDate(args)
 
   // maybe instead of an "ProcessContext" which is very "java-like" this should be a map?
   // recalling my original idea it was to allow the date argument to be used an what it is
   // an Option. The same for holidays so maybe using an object here makes sense.
-  val context = new ProcessContext(args(0), processArguments, date)
+  val context = new ProcessContext(arguments.className.get, arguments.otherArgs, arguments.date, arguments.isHoliday)
   dataProcessToRun.execute(context)
-
 }
