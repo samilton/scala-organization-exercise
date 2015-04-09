@@ -60,58 +60,40 @@ object Runner extends App {
   // Here's an idea for building a config object from the args... but maybe there's a
   // library out there to do this.
   case class Arguments(
-                        className: Option[String] = None,
-                        isHoliday: Boolean = false, // optional parameter, so this is a default value
-                        date: Option[Date] = None,
-                        otherArgs: List[String] = Nil
-                        )
+    className: Option[String] = None,
+    isHoliday: Boolean        = false, // optional parameter, so this is a default value
+    date:      Option[Date]   = None,
+    otherArgs: List[String]   = Nil
+  )
 
   @tailrec
-  def parseArguments(args: Seq[String], a: Arguments = Arguments()): Arguments = {
+  def parseArguments(args: List[String], a: Arguments = Arguments()): Arguments = args match {
+    case Nil =>
+      // no more args
+      a
 
-    val genArg = """--([a-zA-Z0-9_]+)""".r
+    case "--date" :: dateStr :: as =>
+      // parse the date - maybe hoist this format object
+      val d = new SimpleDateFormat("yyyyMMdd").parse(dateStr)
+      parseArguments(as, a.copy(date = Some(d)))
 
-    args match {
-      case Nil =>
-        // no more args
-        a
+    case "--holiday" :: as =>
+      // holiday flag
+      parseArguments(as, a.copy(isHoliday = true))
 
-      case "--date" :: dateStr :: as =>
-        // parse the date - maybe hoist this format object
-        val d = new SimpleDateFormat("yyyyMMdd").parse(dateStr)
-        parseArguments(as, a.copy(date = Some(d)))
+    case "--" :: as =>
+      // gnu-style end of params marker; stop here
+      a.copy(otherArgs = as)
 
-      case "--holiday" :: as =>
-        // holiday flag
-        parseArguments(as, a.copy(isHoliday = true))
-
-      case "--trading" :: as =>
-        // how to add a new flag or argument. You can require as many values
-        // as you like. Just create a new Arguments and recurse with the tail of
-        // the list (as).
-        parseArguments(as, a)
-
-      case genArg(argName) :: as =>
-        // Match on regexes and pull out the capturing group. The only issue here is
-        // you have to manually pull stuff out of "as" if the arg needs a value.
-        val (argVals, as2) = as span (!_.startsWith("--"))
-
-        parseArguments(as2, a)
-
-      case "--" :: as =>
-        // gnu-style end of params marker; stop here
-        a.copy(otherArgs = as)
-
-      case string :: as =>
-        // first string is the classname
-        if (a.className.isDefined)
-          sys.error("duplicate classname specified")
-        else
-          parseArguments(as, a.copy(className = Some(string)))
-    }
+    case string :: as =>
+      // first string is the classname
+      if (a.className.isDefined)
+        sys.error("duplicate classname specified")
+      else
+        parseArguments(as, a.copy(className = Some(string)))
   }
 
-    val arguments = parseArguments(args)
+  val arguments = parseArguments(args.toList)
 
   val dataProcessToRun = arguments.className match {
     case Some(c) => getObjectToRun(c) match {
@@ -124,7 +106,7 @@ object Runner extends App {
   // maybe instead of an "ProcessContext" which is very "java-like" this should be a map?
   // recalling my original idea it was to allow the date argument to be used an what it is
   // an Option. The same for holidays so maybe using an object here makes sense.
-  val context = new ProcessContext(arguments.className.get, args.asInstanceOf[List[String]], arguments.date, arguments.isHoliday)
+  val context = new ProcessContext(arguments.className.get, arguments.otherArgs, arguments.date, arguments.isHoliday)
 
   dataProcessToRun.execute(context)
 }
