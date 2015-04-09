@@ -1,14 +1,15 @@
 package com.pragmafs.dataplant
 
 import java.lang.management.ManagementFactory
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.core.util.StatusPrinter
 import org.slf4j.LoggerFactory
 
-import scala.util.{Failure, Success, Try}
-import java.util.Date
-import java.text.SimpleDateFormat
 import scala.annotation.tailrec
+import scala.util.{Failure, Success, Try}
 
 
 /*
@@ -32,6 +33,7 @@ import scala.annotation.tailrec
  */
 object Runner extends App {
   // Adds implicits that let us convert from Java to Scala collections easily
+
   import scala.collection.JavaConversions._
 
   private[this] val logger = LoggerFactory.getLogger(Runner.getClass)
@@ -50,8 +52,6 @@ object Runner extends App {
   // less punctuation, use string interpolation
   logger.info(s"Options are [${args mkString ","}]")
 
-  // TODO this group of methods is messy. there has to be a better way to compose this. (more java than scala)
-  // TODO Need to get some error handling on here. Maybe this should be an object itself?
   // You could wrap this in a Try like this
   def getObjectToRun(clazz: String): Try[DataProcess] = Try {
     Class.forName(clazz).newInstance().asInstanceOf[DataProcess]
@@ -60,11 +60,11 @@ object Runner extends App {
   // Here's an idea for building a config object from the args... but maybe there's a
   // library out there to do this.
   case class Arguments(
-    className: Option[String] = None,
-    isHoliday: Boolean        = false,       // optional parameter, so this is a default value
-    date:      Option[Date]   = None,
-    otherArgs: List[String]   = Nil
-  )
+                        className: Option[String] = None,
+                        isHoliday: Boolean = false, // optional parameter, so this is a default value
+                        date: Option[Date] = None,
+                        otherArgs: List[String] = Nil
+                        )
 
   @tailrec
   def parseArguments(args: Seq[String], a: Arguments = Arguments()): Arguments = {
@@ -118,12 +118,13 @@ object Runner extends App {
       case Success(d) => d
       case Failure(e) => sys.error(s"unable to load class $c; ${e.getMessage}")
     }
-    case None    => sys.error("no classname specified")
+    case None => sys.error("no classname specified")
   }
 
   // maybe instead of an "ProcessContext" which is very "java-like" this should be a map?
   // recalling my original idea it was to allow the date argument to be used an what it is
   // an Option. The same for holidays so maybe using an object here makes sense.
   val context = new ProcessContext(arguments.className.get, arguments.otherArgs, arguments.date, arguments.isHoliday)
+
   dataProcessToRun.execute(context)
 }

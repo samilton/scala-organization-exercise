@@ -21,12 +21,6 @@ class FIXLogLoader extends DataProcess {
   }
 
   // override FTW
-  override def execute(args: List[String], date: Option[Date]) = {
-    logger.info("I am running (non context based)")
-
-  }
-
-  // override FTW
   override def execute(context: ProcessContext): Unit = {
     val conf = new Conf(context.arguments)
 
