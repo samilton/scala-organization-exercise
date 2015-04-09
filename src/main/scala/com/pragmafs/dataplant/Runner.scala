@@ -67,30 +67,46 @@ object Runner extends App {
   )
 
   @tailrec
-  def parseArguments(args: Seq[String], a: Arguments = Arguments()): Arguments = args match {
-    case Nil =>
-      // no more args
-      a
+  def parseArguments(args: Seq[String], a: Arguments = Arguments()): Arguments = {
 
-    case "--date" :: dateStr :: as =>
-      // parse the date - maybe hoist this format object
-      val d = new SimpleDateFormat("yyyyMMdd").parse(dateStr)
-      parseArguments(as, a.copy(date = Some(d)))
+    val genArg = """--([a-zA-Z0-9_]+)""".r
 
-    case "--holiday" :: as =>
-      // holiday flag
-      parseArguments(as, a.copy(isHoliday = true))
+    args match {
+      case Nil =>
+        // no more args
+        a
 
-    case "--" :: as =>
-      // gnu-style end of params marker; stop here
-      a.copy(otherArgs = as)
+      case "--date" :: dateStr :: as =>
+        // parse the date - maybe hoist this format object
+        val d = new SimpleDateFormat("yyyyMMdd").parse(dateStr)
+        parseArguments(as, a.copy(date = Some(d)))
 
-    case string :: as =>
-      // first string is the classname
-      if (a.className.isDefined)
-        sys.error("duplicate classname specified")
-      else
-        parseArguments(as, a.copy(className = Some(string)))
+      case "--holiday" :: as =>
+        // holiday flag
+        parseArguments(as, a.copy(isHoliday = true))
+
+      case "--trading" :: as =>
+        // how to add a new flag or argument. You can require as many values
+        // as you like. Just create a new Arguments and recurse with the tail of
+        // the list (as).
+        parseArguments(as, a)
+
+      case genArg(argName) :: as =>
+        // Match on regexes and pull out the capturing group. The only issue here is
+        // you have to manually pull stuff out of "as" if the arg needs a value.
+        parseArguments(as, a)
+
+      case "--" :: as =>
+        // gnu-style end of params marker; stop here
+        a.copy(otherArgs = as)
+
+      case string :: as =>
+        // first string is the classname
+        if (a.className.isDefined)
+          sys.error("duplicate classname specified")
+        else
+          parseArguments(as, a.copy(className = Some(string)))
+    }
   }
 
   val arguments = parseArguments(args)
