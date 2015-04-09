@@ -16,5 +16,5 @@ ${maven} clean
 ${maven} package
 
 (echo 'exec java -jar "$0" "$@"'; cat target/runner.jar ) > runner
-chmod +x runner.jar
+chmod +x runner
 

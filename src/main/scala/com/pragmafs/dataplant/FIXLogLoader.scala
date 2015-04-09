@@ -4,15 +4,13 @@ import org.rogach.scallop.ScallopConf
 import org.slf4j.LoggerFactory
 import java.util.Date
 
-/**
- * Created by shamilton on 3/27/15.
- */
 class FIXLogLoader extends DataProcess {
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
-    val trading = opt[Boolean](required = false, noshort = true, descr = "Some sort of crap about crap")
+    val database = opt[String](required = false, noshort = true, descr = "JDBC URL")
+    val domain = opt[String](required = false, noshort = true, descr = "Client Environment to against")
   }
 
   // override FTW
@@ -33,9 +31,8 @@ class FIXLogLoader extends DataProcess {
     }
 
     // string interpolation
-    logger.info(s"running against [$date]")
+    logger.info(s"running against [$date] connecting to ${conf.database()} for client ${conf.domain()}")
 
-    logger.info("I am running (context based)")
   }
 
 }

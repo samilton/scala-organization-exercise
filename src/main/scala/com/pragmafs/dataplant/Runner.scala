@@ -111,7 +111,7 @@ object Runner extends App {
     }
   }
 
-  val arguments = parseArguments(args)
+    val arguments = parseArguments(args)
 
   val dataProcessToRun = arguments.className match {
     case Some(c) => getObjectToRun(c) match {
@@ -124,7 +124,7 @@ object Runner extends App {
   // maybe instead of an "ProcessContext" which is very "java-like" this should be a map?
   // recalling my original idea it was to allow the date argument to be used an what it is
   // an Option. The same for holidays so maybe using an object here makes sense.
-  val context = new ProcessContext(arguments.className.get, arguments.otherArgs, arguments.date, arguments.isHoliday)
+  val context = new ProcessContext(arguments.className.get, args.asInstanceOf[List[String]], arguments.date, arguments.isHoliday)
 
   dataProcessToRun.execute(context)
 }
