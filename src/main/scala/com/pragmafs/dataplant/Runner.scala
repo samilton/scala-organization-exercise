@@ -94,9 +94,9 @@ object Runner extends App {
       case genArg(argName) :: as =>
         // Match on regexes and pull out the capturing group. The only issue here is
         // you have to manually pull stuff out of "as" if the arg needs a value.
-        val argVals = as takeWhile (!_.startsWith("--"))
+        val (argVals, as2) = as span (!_.startsWith("--"))
 
-        parseArguments(as, a)
+        parseArguments(as2, a)
 
       case "--" :: as =>
         // gnu-style end of params marker; stop here
